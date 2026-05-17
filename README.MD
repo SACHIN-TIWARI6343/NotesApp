@@ -74,9 +74,9 @@ npm install
 ```
 
 Create a `.env` file:
-MONGODB_URI=your_mongodb_atlas_uri
-JWT_SECRET=your_jwt_secret
-PORT=3000
+MONGODB_URI=my_mongodb_atlas_uri
+JWT_SECRET=my_jwt_secret
+PORT=my_server_port
 
 ```bash
 npm start
