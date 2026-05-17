@@ -79,7 +79,7 @@ JWT_SECRET=my_jwt_secret
 PORT=my_server_port
 
 ```bash
-npm start
+nodemon src/server.js
 ```
 
 ---
