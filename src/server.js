@@ -17,4 +17,4 @@ const startServer = async ()=>{
     });
 } 
 
-startServer(); // Call the function to start the server
+startServer(); // Call the function to start the server and connect to the database
