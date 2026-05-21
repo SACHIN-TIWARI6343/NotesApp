@@ -55,6 +55,7 @@ const register = async (req, res) => {
     return res.status(201).json({
       message: "User registered successfully",
     });
+
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({
@@ -75,7 +76,7 @@ const login = async (req, res) => {
             });
         }
 
-       // trim email  as well as password to remove leading and trailing whitespace
+       // trim email  to remove leading and trailing whitespace
         const trimmedEmail = email.trim();
         
 

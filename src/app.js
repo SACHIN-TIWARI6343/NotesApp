@@ -42,7 +42,4 @@ app.get("/profile", authMiddleware, (req, res) => {
 });
 
 
-
-
-
 module.exports = app; // Export the app for use in other files (e.g., server.js)

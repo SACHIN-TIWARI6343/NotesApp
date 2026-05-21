@@ -1,6 +1,8 @@
 const Note = require("../models/Note");
 const User = require("../models/User");
 const mongoose = require("mongoose");
+
+
 const createNote = async (req, res) => {
   try {
     const { title, content } = req.body;
@@ -16,7 +18,7 @@ const createNote = async (req, res) => {
     const note = await Note.create({
       title,
       content,
-      owner: req.user._id,
+      owner: req.user._id, // this is the important line where we associate the note with the authenticated user
     });
 
     // Return response
@@ -29,10 +31,12 @@ const createNote = async (req, res) => {
     });
 
    } catch (error) {
+
     console.error("Create note error:", error);
     return res.status(500).json({
       message: "Internal server error",
     });
+
    }
 };
 
@@ -55,15 +59,20 @@ const getAllNotes = async (req, res) => {
     }));
 
     return res.status(200).json(response);
+
   } catch (error) {
     console.error("Get all notes error:", error);
     return res.status(500).json({
       message: "Internal server error",
     });
+
   }
 };
+
+
 const getNoteById = async (req, res) => {
   try {
+
     const { id } = req.params;
 
     // Validate MongoDB ObjectId format
@@ -83,12 +92,8 @@ const getNoteById = async (req, res) => {
       });
     }
 
-    // Only the owner can access the note (for now)
-  //  if (note.owner.toString() !== req.user._id.toString()) {
-  ///    return res.status(403).json({
-   //     message: "Forbidden",
-  //    });
-  //  }
+
+    // Authorization check: user must be owner or in sharedWith
     const isOwner =
     note.owner.toString() === req.user._id.toString();
 
@@ -96,6 +101,8 @@ const getNoteById = async (req, res) => {
      (userId) =>
       userId.toString() === req.user._id.toString()
     );  
+
+
 
     if (!isOwner && !isSharedWithUser) {
      return res.status(403).json({
@@ -113,6 +120,8 @@ const getNoteById = async (req, res) => {
       created_at: note.created_at,
       updated_at: note.updated_at,
     });
+
+    
   } catch (error) {
     console.error("Get note by ID error:", error);
     return res.status(500).json({
@@ -178,6 +187,8 @@ const updateNote = async (req, res) => {
     });
   }
 };
+
+
 const deleteNote = async (req, res) => {
   try {
     const { id } = req.params;
@@ -211,6 +222,7 @@ const deleteNote = async (req, res) => {
 
     // 204 No Content
     return res.status(204).send();
+
   } catch (error) {
     console.error("Delete note error:", error);
     return res.status(500).json({
@@ -218,6 +230,7 @@ const deleteNote = async (req, res) => {
     });
   }
 };
+
 
 const toggleArchiveNote = async (req, res) => {
   try {
@@ -253,6 +266,7 @@ const toggleArchiveNote = async (req, res) => {
     // Save note
     await note.save();
 
+
     // Return response
     return res.status(200).json({
       message: note.archived
@@ -260,7 +274,10 @@ const toggleArchiveNote = async (req, res) => {
         : "Note unarchived successfully",
       archived: note.archived,
     });
+
+
   } catch (error) {
+    
     console.error("Toggle archive error:", error);
     return res.status(500).json({
       message: "Internal server error",
