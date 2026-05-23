@@ -12,7 +12,7 @@ const loginUser = async (email, password) => {
 
     // Check user exists
     if (!user) {
-        throw new Error("Invalid email or password");
+        return { status: 401, message: "Invalid email or password" };
     }
 
     // Compare password
@@ -23,7 +23,7 @@ const loginUser = async (email, password) => {
 
     // Password mismatch
     if (!isMatch) {
-        throw new Error("Invalid email or password");
+        return { status: 401, message: "Invalid email or password" };
     }
 
     // Generate JWT token

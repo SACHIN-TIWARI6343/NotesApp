@@ -1,5 +1,4 @@
-const Note = require("../models/Note");
-const User = require("../models/User");
+
 const mongoose = require("mongoose");
 
 const { 
@@ -8,6 +7,8 @@ const {
       , getNotebyId
       , updateUserNote
       , deleteUserNote
+      , toggleUsrNoteArchive
+      , shareNoteWithUser
 
 } = require("../services/noteService.js");
 
@@ -36,14 +37,14 @@ const createNote = async (req, res) => {
       updated_at: note.updated_at,
     });
 
-   } catch (error) {
+  } catch (error) {
 
-    console.error("Create note error:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+   console.error("Create note error:", error);
+   return res.status(500).json({
+    message: "Internal server error",
+   });
 
-   }
+  }
 };
 
 const getAllNotes = async (req, res) => {
@@ -68,7 +69,6 @@ const getAllNotes = async (req, res) => {
     return res.status(500).json({
       message: "Internal server error",
     });
-
   }
 };
 
@@ -79,22 +79,11 @@ const getNoteById = async (req, res) => {
     // parse note id from request parameters
     const { id } = req.params;
 
-    const note = await getNotebyId(id);
 
-    // check what service function returned and handle accordingly
-    if (note instanceof Error) {
-      if (note.message === "Note not found") {
-        return res.status(404).json({
-          message: "Note not found",
-        });
-      }
+    const note = await getNotebyId(id, req.user._id);
+    if (note && note.status) {
+      return res.status(note.status).json({ message: note.message });
     }
-      if (note.message === "Forbidden") {
-        return res.status(403).json({
-          message: "Forbidden",
-        });
-       }
-
 
     // Success response formating
     return res.status(200).json({
@@ -107,6 +96,18 @@ const getNoteById = async (req, res) => {
     
   } catch (error) {
     console.error("Get note by ID error:", error);
+
+      if (error.message === "Note not found") {
+        return res.status(404).json({
+          message: "Note not found",
+        });
+      }
+        if (error.message === "Forbidden") {
+          return res.status(403).json({
+            message: "Forbidden",
+          });
+        }
+
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -120,6 +121,13 @@ const updateNote = async (req, res) => {
     const { id } = req.params;
     const { title, content } = req.body;
 
+    // Validate required fields
+    if (!title || !content) {
+      return res.status(400).json({
+        message: "Title and content are required",
+      });
+    }
+
     // Validate note ID format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
@@ -128,6 +136,7 @@ const updateNote = async (req, res) => {
     }
     
     const note = await updateUserNote(id, req.user._id, title, content);
+   
 
     // Return updated note
     return res.status(200).json({
@@ -170,7 +179,10 @@ const deleteNote = async (req, res) => {
       });
     }
 
-    await deleteUserNote(id, req.user._id);
+    const result = await deleteUserNote(id, req.user._id);
+    if (result && result.status) {
+      return res.status(result.status).json({ message: result.message });
+    }
 
     // 204 No Content
     return res.status(204).send();
@@ -209,8 +221,9 @@ const toggleArchiveNote = async (req, res) => {
 
     // Find note
     const note = await toggleUsrNoteArchive(id, req.user._id);
-
-    
+    if (note && note.status) {
+      return res.status(note.status).json({ message: note.message });
+    }
 
     // Return response
     return res.status(200).json({
@@ -248,14 +261,28 @@ const shareNote = async (req, res) => {
     const { id } = req.params;
     const { share_with_email } = req.body;
 
+    // check where id and email is present or not
+    if (!share_with_email) {
+      return res.status(400).json({
+        message: "share_with_email is required",
+      });
+    }
+      if(!id)
+      {
+        return res.status(400).json({
+          message: "Note ID is required",
+        });
+      }
+
+
     // 1. Validate note ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(404).json({
-        message: "Note not found",
+        message: "Invalid note ID",
       });
     }
    
-    const  sharedNote = await shareUserNote(id, req.user._id, share_with_email);
+    const  sharedNote = await shareNoteWithUser(id, req.user._id, share_with_email);
 
     // 10. Success response
     return res.status(200).json({
