@@ -2,9 +2,19 @@ const Note = require("../models/Note");
 const User = require("../models/User");
 const mongoose = require("mongoose");
 
+const { 
+        createUserNote
+      , getUserNotes
+      , getNotebyId
+      , updateUserNote
+      , deleteUserNote
+
+} = require("../services/noteService.js");
 
 const createNote = async (req, res) => {
   try {
+
+    // Request body parsing 
     const { title, content } = req.body;
 
     // Validation
@@ -14,13 +24,9 @@ const createNote = async (req, res) => {
       });
     }
 
-    // Create note
-    const note = await Note.create({
-      title,
-      content,
-      owner: req.user._id, // this is the important line where we associate the note with the authenticated user
-    });
-
+    // Create note  service function call
+    const note = await createUserNote(title, content, req.user._id);
+    
     // Return response
     return res.status(201).json({
       id: note._id,
@@ -44,19 +50,16 @@ const getAllNotes = async (req, res) => {
   try {
     // Find notes owned by the authenticated user
     // Exclude archived notes by default
-    const notes = await Note.find({
-      owner: req.user._id,
-      archived: false,
-    }).sort({ created_at: -1 });
+    const notes = await  getUserNotes(req.user._id);
 
     // Transform documents into API response format
     const response = notes.map((note) => ({
       id: note._id,
       title: note.title,
       content: note.content,
-      created_at: note.created_at,
-      updated_at: note.updated_at,
-    }));
+     created_at: note.created_at,
+     updated_at: note.updated_at,
+   }));
 
     return res.status(200).json(response);
 
@@ -72,47 +75,28 @@ const getAllNotes = async (req, res) => {
 
 const getNoteById = async (req, res) => {
   try {
-
+    
+    // parse note id from request parameters
     const { id } = req.params;
 
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
+    const note = await getNotebyId(id);
+
+    // check what service function returned and handle accordingly
+    if (note instanceof Error) {
+      if (note.message === "Note not found") {
+        return res.status(404).json({
+          message: "Note not found",
+        });
+      }
     }
-
-    // Find the note by ID
-    const note = await Note.findById(id);
-
-    // Note does not exist
-    if (!note) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
-    }
+      if (note.message === "Forbidden") {
+        return res.status(403).json({
+          message: "Forbidden",
+        });
+       }
 
 
-    // Authorization check: user must be owner or in sharedWith
-    const isOwner =
-    note.owner.toString() === req.user._id.toString();
-
-    const isSharedWithUser = note.sharedWith.some(
-     (userId) =>
-      userId.toString() === req.user._id.toString()
-    );  
-
-
-
-    if (!isOwner && !isSharedWithUser) {
-     return res.status(403).json({
-     message: "Forbidden",
-     }); 
-   } 
-
-
-
-    // Success response
+    // Success response formating
     return res.status(200).json({
       id: note._id,
       title: note.title,
@@ -120,7 +104,6 @@ const getNoteById = async (req, res) => {
       created_at: note.created_at,
       updated_at: note.updated_at,
     });
-
     
   } catch (error) {
     console.error("Get note by ID error:", error);
@@ -132,6 +115,8 @@ const getNoteById = async (req, res) => {
 
 const updateNote = async (req, res) => {
   try {
+
+    // data parsing from request body and parameters
     const { id } = req.params;
     const { title, content } = req.body;
 
@@ -141,36 +126,8 @@ const updateNote = async (req, res) => {
         message: "Note not found",
       });
     }
-
-    // Validate request body
-    if (!title || !content) {
-      return res.status(400).json({
-        message: "Title and content are required",
-      });
-    }
-
-    // Find note
-    const note = await Note.findById(id);
-
-    // Note not found
-    if (!note) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
-    }
-
-    // Authorization check
-    if (note.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
-    }
-
-    // Update note
-    note.title = title;
-    note.content = content;
-
-    await note.save();
+    
+    const note = await updateUserNote(id, req.user._id, title, content);
 
     // Return updated note
     return res.status(200).json({
@@ -179,9 +136,22 @@ const updateNote = async (req, res) => {
       content: note.content,
       created_at: note.created_at,
       updated_at: note.updated_at,
-    });
+    }); 
+
   } catch (error) {
     console.error("Update note error:", error);
+
+      if (error.message === "Note not found") {
+        return res.status(404).json({
+          message: "Note not found",
+        });
+      }
+      if (error.message === "Forbidden") {
+        return res.status(403).json({
+          message: "Forbidden",
+        });
+       }
+    
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -200,31 +170,27 @@ const deleteNote = async (req, res) => {
       });
     }
 
-    // Find note
-    const note = await Note.findById(id);
-
-    // Note not found
-    if (!note) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
-    }
-
-    // Authorization check
-    if (note.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
-    }
-
-    // Delete note
-    await note.deleteOne();
+    await deleteUserNote(id, req.user._id);
 
     // 204 No Content
     return res.status(204).send();
 
   } catch (error) {
     console.error("Delete note error:", error);
+  
+      if (error.message === "Note not found") {
+        return res.status(404).json({
+          message: "Note not found",
+        });
+      }
+      if (error.message === "Forbidden") {
+        return res.status(403).json({
+          message: "Forbidden",
+        });
+       }
+
+
+
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -244,28 +210,9 @@ const toggleArchiveNote = async (req, res) => {
     }
 
     // Find note
-    const note = await Note.findById(id);
+    const note = await toggleUsrNoteArchive(id, req.user._id);
 
-    // Check if note exists
-    if (!note) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
-    }
-
-    // Only owner can archive/unarchive
-    if (note.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
-    }
-
-    // Toggle archived value
-    note.archived = !note.archived;
-
-    // Save note
-    await note.save();
-
+    
 
     // Return response
     return res.status(200).json({
@@ -279,6 +226,18 @@ const toggleArchiveNote = async (req, res) => {
   } catch (error) {
     
     console.error("Toggle archive error:", error);
+ 
+    if (error.message === "Note not found") {
+      return res.status(404).json({
+        message: "Note not found",
+      });
+    }
+    if( error.message === "Forbidden") {
+      return res.status(403).json({
+        message: "Forbidden",
+      });
+    }
+
     return res.status(500).json({
       message: "Internal server error",
     });
@@ -297,70 +256,14 @@ const shareNote = async (req, res) => {
         message: "Note not found",
       });
     }
-
-    // 2. Validate request body
-    if (!share_with_email) {
-      return res.status(400).json({
-        message: "share_with_email is required",
-      });
-    }
-
-    // 3. Find note
-    const note = await Note.findById(id);
-
-    if (!note) {
-      return res.status(404).json({
-        message: "Note not found",
-      });
-    }
-
-    // 4. Only owner can share
-    if (note.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
-    }
-
-    // 5. Find target user by email
-    const targetUser = await User.findOne({
-      email: share_with_email,
-    });
-
-    if (!targetUser) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-
-    // 6. Prevent sharing with yourself
-    if (targetUser._id.toString() === req.user._id.toString()) {
-      return res.status(400).json({
-        message: "You cannot share a note with yourself",
-      });
-    }
-
-    // 7. Prevent duplicates
-    const alreadyShared = note.sharedWith.some(
-      (userId) =>
-        userId.toString() === targetUser._id.toString()
-    );
-
-    if (alreadyShared) {
-      return res.status(200).json({
-        message: "Note is already shared with this user",
-      });
-    }
-
-    // 8. Add target user to sharedWith
-    note.sharedWith.push(targetUser._id);
-
-    // 9. Save note
-    await note.save();
+   
+    const  sharedNote = await shareUserNote(id, req.user._id, share_with_email);
 
     // 10. Success response
     return res.status(200).json({
       message: "Note shared successfully",
     });
+
   } catch (error) {
     console.error("Share note error:", error);
     return res.status(500).json({
